@@ -146,7 +146,7 @@
 
   <Target Name="NUnitTests" Outputs="%(NUnitTestItem.Identity)" Condition="@(NUnitTestitem) != ''">
     <PropertyGroup>
-      <TestProjectDir>$(MSBuildProjectDirectory)\tests\%(NUnitTestItem.Identity)</TestProjectDir>
+      <TestProjectDir>$(TestProjectBaseDir)\%(NUnitTestItem.Identity)</TestProjectDir>
       <TestDir>$(TestProjectDir)\bin\$(Configuration)</TestDir>
 	  <IsEnvironmentSpecificTest Condition="%(NUnitTestItem.EnvironmentSpecific) == '' or !%(NUnitTestItem.EnvironmentSpecific)">false</IsEnvironmentSpecificTest>
 	  <IsEnvironmentSpecificTest Condition="%(NUnitTestItem.EnvironmentSpecific) != '' and %(NUnitTestItem.EnvironmentSpecific)">true</IsEnvironmentSpecificTest>
