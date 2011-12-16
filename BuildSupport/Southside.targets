@@ -41,8 +41,8 @@
   
   <UsingTask TaskName="NUnit" AssemblyFile="$(teamcity_dotnet_nunitlauncher_msbuild_task)" Condition="$(InTeamCity)"/>
  
-  <Target Name="Dist" DependsOnTargets="Clean;TransformConfigs;InstallPackages;Version;Build;Test;Document;Publish"/>
-  <Target Name="TeamCityBuild" DependsOnTargets="Clean;TransformConfigs;InstallPackages;Version;Build;Test"/>
+  <Target Name="Dist" DependsOnTargets="Clean;TransformConfigs;Version;Build;Test;Document;Publish"/>
+  <Target Name="TeamCityBuild" DependsOnTargets="Clean;TransformConfigs;Version;Build;Test"/>
   <Target Name="TeamCityPublish" DependsOnTargets="Document;Publish"/>
   
   <Target Name="Clean">
