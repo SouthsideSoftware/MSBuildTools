@@ -14,7 +14,7 @@ REMOVE THIS BANNER AND MODIFY FOR YOUR PROJECT BEFORE ATTEMPTING TO USE
 
   <!-- Project name and description -->
   <PropertyGroup>
-    <CompanyName>Southside Software, LLC</CompanyName>
+    <CompanyName>MyCompany</CompanyName>
     <ProductName>MyProject</ProductName>
     <ProductDescription>MyDescription</ProductDescription>
   </PropertyGroup>

@@ -41,11 +41,16 @@
   
   <UsingTask TaskName="NUnit" AssemblyFile="$(teamcity_dotnet_nunitlauncher_msbuild_task)" Condition="$(InTeamCity)"/>
  
-  <Target Name="Dist" DependsOnTargets="Clean;TransformConfigs;Version;Build;Test;Document;Publish"/>
-  <Target Name="TeamCityBuild" DependsOnTargets="Clean;TransformConfigs;Version;Build;Test"/>
+  <Target Name="Dist" DependsOnTargets="CheckObsolete;Clean;TransformConfigs;Version;Build;Test;Document;Publish"/>
+  <Target Name="TeamCityBuild" DependsOnTargets="CheckObsolete;Clean;TransformConfigs;Version;Build;Test"/>
   <Target Name="TeamCityPublish" DependsOnTargets="Document;Publish"/>
   
-  <Target Name="Clean">
+  <Target Name="CheckObsolete">
+	<Error Text="Use CreateNugetPackagesDependsOn instead of CustomPublishTask to extend the Publish task" Condition="$(CustomPublishTask) != ''"/>
+	<Error Text="Use PublishWebDependsOn instead of CopyAdditionalWebFilesTarget to extend the PublishWeb task" Condition="$(CopyAdditionalWebFilesTarget) != ''"/>
+  </Target>
+	
+  <Target Name="Clean" DependsOnTargets="$(CleanDependsOn)">
     <Message Importance="high" Text="Clean"/>
     <Message Importance="high" Text="======================================================="/>
     <Message Importance="high" Text="Configuration = $(Configuration)"/>
@@ -88,7 +93,7 @@
       <ProjectWithPackages Include="%(Values.path)"/>
     </ItemGroup>
     <Exec WorkingDirectory="$(PackageDir)" 
-          Command="cmd /c $(NuGet) install %(ProjectWithPackages.Identity) -s https://go.microsoft.com/fwlink/?LinkID=206669 &lt; $(OutputDir)\credentials.txt"/>
+          Command="cmd /c $(NuGet) install %(ProjectWithPackages.Identity) -s $(PublicNugetUrl) &lt; $(OutputDir)\credentials.txt"/>
   </Target>
   
   <Target Name="Version">
@@ -186,7 +191,7 @@
     <CallTarget Targets="PublishHelp"/>
 	<CallTarget Targets="PublishWeb"/>
     <CallTarget Targets="$(CustomPublishTask)" Condition="$(CustomPublishTask) != ''"/>
-    <CallTarget Targets="CreateNugetPackage"/>
+    <CallTarget Targets="CreateNugetPackages"/>
     <CallTarget Targets="PublishNugetPackages"/>
   </Target>
 
@@ -217,7 +222,7 @@
     <Copy SourceFiles="@(HelpFiles)" DestinationFolder="$(PublicWebHelpDir)\%(RecursiveDir)"/>
   </Target>
   
-  <Target Name="PublishWeb" Condition="$(WebProjectDir) != ''">
+  <Target Name="PublishWeb" Condition="$(WebProjectDir) != ''" DependsOnTargets="$(PublishWebDependsOn)">
 	<Message Importance="high" Text="PublishWeb"/>
 	<ItemGroup>
 	  <WebFiles Include="$(WebProjectDir)\**\*.*"
@@ -231,7 +236,6 @@
 	</ItemGroup>
       	
     <Copy SourceFiles="@(WebFiles)" DestinationFolder="$(WebDir)\%(RecursiveDir)"/>
-	<CallTarget Targets="$(CopyAdditionalWebFilesTarget)" Condition="$(CopyAdditionalWebFilesTarget) != ''"/>
 	
 	<ItemGroup>
       <ZipWebFiles Include="$(WebDir)\**\*.*"/>
@@ -244,9 +248,23 @@
 	<Zip Files="@(ZipWebFiles)" WorkingDirectory="$(WebDir)" ZipFileName="$(ZipWebFileName)"/>	
 	
   </Target>
+  
+  <Target Name="CreateNugetPackages" Condition="@(NugetItem) != ''" DependsOnTargets="$(CreateNugetPackagesDependsOn)">
+    <Message Importance="high" Text="CreateNugetPackages"/>
+    <CallTarget Targets="CreateNugetPackage"/>
+  </Target>
 
-  <Target Name="CreateNugetPackage" Condition="@(NugetItem) != ''">
+  <Target Name="CreateNugetPackage" Outputs="%(NugetItem.Identity)" Condition="@(NugetItem) != ''">
     <Message Importance="high" Text="CreateNugetPackage"/>
+	
+	<PropertyGroup>
+		<PackageVersion Condition="%(NugetItem.OverrideVersion) != ''">%(NugetItem.OverrideVersion)</PackageVersion>
+		<PackageVersion Condition="%(NugetItem.OverrideVersion) == '' AND !$(UseSemanticVersioning)">$(AppVersion).$(BuildNumber)</PackageVersion>
+		<PackageVersion Condition="%(NugetItem.OverrideVersion) == '' AND $(UseSemanticVersioning) AND $(SemanticVersion) == ''">$(AppVersion)</PackageVersion>
+		<PackageVersion Condition="%(NugetItem.OverrideVersion) == '' AND $(UseSemanticVersioning) AND $(SemanticVersion) != ''">$(AppVersion)-$(SemanticVersion)</PackageVersion>
+	</PropertyGroup>
+	
+	<Message Importance="high" Text="Version for %(NugetItem.Identity) is $(PackageVersion)"/>
 
     <XmlUpdate XmlFileName="%(NugetItem.Identity).nuspec"
                Namespace="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd"
@@ -258,7 +276,7 @@
                Namespace="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd"
                Prefix="n"
                XPath="//n:version"
-               Value="$(AppVersion).$(BuildNumber)"/>
+               Value="$(PackageVersion)"/>
 
     <Exec WorkingDirectory="$(NuGetPackageDir)" Command="$(NuGet) pack $(MSBuildProjectDirectory)\%(NugetItem.Identity).nuspec"/>
   </Target>
@@ -270,7 +288,17 @@
   
   <Target Name="PublishNugetPackage" Outputs="%(NugetItem.Identity)" Condition="$(PublishNugetPackages)">
 	<Message Importance="high" Text="Publish package %(NugetItem.NugetPackageId)" Condition="%(NugetItem.NugetPushUrl) != ''"/>
-    <Exec WorkingDirectory="$(NuGetPackageDir)" Command="cmd.exe /c $(NuGet) push %(NugetItem.NugetPackageId).$(AppVersion).$(BuildNumber).nupkg  %(NugetItem.NugetApiKey) -source %(NugetItem.NugetPushUrl) &lt; $(OutputDir)\credentials.txt" 
+	
+	<PropertyGroup>
+		<PackageVersion Condition="%(NugetItem.OverrideVersion) != ''">%(NugetItem.OverrideVersion)</PackageVersion>
+		<PackageVersion Condition="%(NugetItem.OverrideVersion) == '' AND !$(UseSemanticVersioning)">$(AppVersion).$(BuildNumber)</PackageVersion>
+		<PackageVersion Condition="%(NugetItem.OverrideVersion) == '' AND $(UseSemanticVersioning) AND $(SemanticVersion) == ''">$(AppVersion)</PackageVersion>
+		<PackageVersion Condition="%(NugetItem.OverrideVersion) == '' AND $(UseSemanticVersioning) AND $(SemanticVersion) != ''">$(AppVersion)-$(SemanticVersion)</PackageVersion>
+		<PushUrl Condition="%(NugetItem.NugetPushUrl) == '$(BlindsNugetServer)'">$(BlindsNugetPushUrl)</PushUrl>
+		<PushUrl Condition="%(NugetItem.NugetPushUrl) != '$(BlindsNugetServer)'">%(NugetItem.NugetPushUrl)</PushUrl>
+	</PropertyGroup>
+	
+    <Exec WorkingDirectory="$(NuGetPackageDir)" Command="cmd.exe /c $(NuGet) push %(NugetItem.NugetPackageId).$(PackageVersion).nupkg  %(NugetItem.NugetApiKey) -source $(PushUrl) &lt; $(OutputDir)\credentials.txt" 
 	  Condition="%(NugetItem.NugetPushUrl) != ''"/>
   </Target>
   
